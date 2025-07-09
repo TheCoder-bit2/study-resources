@@ -15,6 +15,34 @@ interface ToastState {
   show: boolean;
 }
 
+// Modal component defined outside to prevent re-creation on every render
+const Modal: React.FC<{ 
+  isOpen: boolean; 
+  onClose: () => void; 
+  title: string; 
+  children: React.ReactNode 
+}> = ({ isOpen, onClose, title, children }) => {
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+      <div className="bg-white rounded-lg p-6 w-full max-w-md">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-xl font-bold text-gray-800">{title}</h3>
+          <button
+            onClick={onClose}
+            className="text-gray-500 hover:text-gray-700"
+            type="button"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+        {children}
+      </div>
+    </div>
+  );
+};
+
 export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
   const [semesters, setSemesters] = useState<Semester[]>([]);
   const [subjects, setSubjects] = useState<Subject[]>([]);
@@ -43,7 +71,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
     setToast({ message, type, show: true });
   }, []);
 
-  const loadSemesters = async () => {
+  const loadSemesters = useCallback(async () => {
     try {
       setLoading(true);
       const data = await api.getSemesters();
@@ -53,73 +81,73 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [showToast]);
 
-  const loadSubjects = async (semesterId: string) => {
+  const loadSubjects = useCallback(async (semesterId: string) => {
     try {
       const data = await api.getSubjects(semesterId);
       setSubjects(data);
     } catch (error) {
       showToast('Error loading subjects', 'error');
     }
-  };
+  }, [showToast]);
 
-  const loadResources = async (subjectId: string) => {
+  const loadResources = useCallback(async (subjectId: string) => {
     try {
       const data = await api.getResources(subjectId);
       setResources(data);
     } catch (error) {
       showToast('Error loading resources', 'error');
     }
-  };
+  }, [showToast]);
 
-  const handleSemesterSelect = (semesterId: string) => {
+  const handleSemesterSelect = useCallback((semesterId: string) => {
     setSelectedSemester(semesterId);
     setSelectedSubject(null);
     setResources([]);
     loadSubjects(semesterId);
-  };
+  }, [loadSubjects]);
 
-  const handleSubjectSelect = (subjectId: string) => {
+  const handleSubjectSelect = useCallback((subjectId: string) => {
     setSelectedSubject(subjectId);
     loadResources(subjectId);
-  };
+  }, [loadResources]);
 
-  // Modal handlers
-  const openSemesterModal = () => {
+  // Modal handlers with useCallback to prevent re-creation
+  const openSemesterModal = useCallback(() => {
     setSemesterName('');
     setShowSemesterModal(true);
-  };
+  }, []);
 
-  const closeSemesterModal = () => {
+  const closeSemesterModal = useCallback(() => {
     setShowSemesterModal(false);
     setSemesterName('');
-  };
+  }, []);
 
-  const openSubjectModal = () => {
+  const openSubjectModal = useCallback(() => {
     setSubjectName('');
     setShowSubjectModal(true);
-  };
+  }, []);
 
-  const closeSubjectModal = () => {
+  const closeSubjectModal = useCallback(() => {
     setShowSubjectModal(false);
     setSubjectName('');
-  };
+  }, []);
 
-  const openResourceModal = () => {
+  const openResourceModal = useCallback(() => {
     setResourceTitle('');
     setResourceLink('');
     setShowResourceModal(true);
-  };
+  }, []);
 
-  const closeResourceModal = () => {
+  const closeResourceModal = useCallback(() => {
     setShowResourceModal(false);
     setResourceTitle('');
     setResourceLink('');
-  };
+  }, []);
 
-  // Form handlers
-  const handleCreateSemester = async (e: React.FormEvent) => {
+  // Form handlers with useCallback
+  const handleCreateSemester = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
     if (!semesterName.trim()) return;
     
@@ -131,9 +159,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
     } catch (error) {
       showToast('Error creating semester', 'error');
     }
-  };
+  }, [semesterName, closeSemesterModal, loadSemesters, showToast]);
 
-  const handleCreateSubject = async (e: React.FormEvent) => {
+  const handleCreateSubject = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
     if (!subjectName.trim() || !selectedSemester) return;
     
@@ -145,9 +173,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
     } catch (error) {
       showToast('Error creating subject', 'error');
     }
-  };
+  }, [subjectName, selectedSemester, closeSubjectModal, loadSubjects, showToast]);
 
-  const handleCreateResource = async (e: React.FormEvent) => {
+  const handleCreateResource = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
     if (!resourceTitle.trim() || !resourceLink.trim() || !selectedSubject) return;
     
@@ -159,9 +187,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
     } catch (error) {
       showToast('Error creating resource', 'error');
     }
-  };
+  }, [resourceTitle, resourceLink, selectedSubject, closeResourceModal, loadResources, showToast]);
 
-  const handleDeleteSemester = async (id: string) => {
+  const handleDeleteSemester = useCallback(async (id: string) => {
     if (!confirm('Are you sure you want to delete this semester and all its contents?')) return;
     
     try {
@@ -177,9 +205,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
     } catch (error) {
       showToast('Error deleting semester', 'error');
     }
-  };
+  }, [selectedSemester, loadSemesters, showToast]);
 
-  const handleDeleteSubject = async (id: string) => {
+  const handleDeleteSubject = useCallback(async (id: string) => {
     if (!confirm('Are you sure you want to delete this subject and all its resources?')) return;
     
     try {
@@ -188,47 +216,45 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
         setSelectedSubject(null);
         setResources([]);
       }
-      loadSubjects(selectedSemester!);
+      if (selectedSemester) {
+        loadSubjects(selectedSemester);
+      }
       showToast('Subject deleted successfully', 'success');
     } catch (error) {
       showToast('Error deleting subject', 'error');
     }
-  };
+  }, [selectedSubject, selectedSemester, loadSubjects, showToast]);
 
-  const handleDeleteResource = async (id: string) => {
+  const handleDeleteResource = useCallback(async (id: string) => {
     if (!confirm('Are you sure you want to delete this resource?')) return;
     
     try {
       await api.deleteResource(id);
-      loadResources(selectedSubject!);
+      if (selectedSubject) {
+        loadResources(selectedSubject);
+      }
       showToast('Resource deleted successfully', 'success');
     } catch (error) {
       showToast('Error deleting resource', 'error');
     }
-  };
+  }, [selectedSubject, loadResources, showToast]);
 
-  // Modal component
-  const Modal: React.FC<{ isOpen: boolean; onClose: () => void; title: string; children: React.ReactNode }> = ({ isOpen, onClose, title, children }) => {
-    if (!isOpen) return null;
+  // Input change handlers with useCallback
+  const handleSemesterNameChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    setSemesterName(e.target.value);
+  }, []);
 
-    return (
-      <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-        <div className="bg-white rounded-lg p-6 w-full max-w-md">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-xl font-bold text-gray-800">{title}</h3>
-            <button
-              onClick={onClose}
-              className="text-gray-500 hover:text-gray-700"
-              type="button"
-            >
-              <X className="w-5 h-5" />
-            </button>
-          </div>
-          {children}
-        </div>
-      </div>
-    );
-  };
+  const handleSubjectNameChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    setSubjectName(e.target.value);
+  }, []);
+
+  const handleResourceTitleChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    setResourceTitle(e.target.value);
+  }, []);
+
+  const handleResourceLinkChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    setResourceLink(e.target.value);
+  }, []);
 
   if (loading) return <LoadingSpinner />;
 
@@ -412,11 +438,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
               id="semesterName"
               type="text"
               value={semesterName}
-              onChange={(e) => setSemesterName(e.target.value)}
+              onChange={handleSemesterNameChange}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
               placeholder="e.g., 4-2"
               required
               autoComplete="off"
+              autoFocus
             />
           </div>
           <div className="flex gap-2">
@@ -452,11 +479,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
               id="subjectName"
               type="text"
               value={subjectName}
-              onChange={(e) => setSubjectName(e.target.value)}
+              onChange={handleSubjectNameChange}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
               placeholder="e.g., Mathematics"
               required
               autoComplete="off"
+              autoFocus
             />
           </div>
           <div className="flex gap-2">
@@ -492,11 +520,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
               id="resourceTitle"
               type="text"
               value={resourceTitle}
-              onChange={(e) => setResourceTitle(e.target.value)}
+              onChange={handleResourceTitleChange}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
               placeholder="e.g., Chapter 1 Notes"
               required
               autoComplete="off"
+              autoFocus
             />
           </div>
           <div>
@@ -507,7 +536,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
               id="resourceLink"
               type="url"
               value={resourceLink}
-              onChange={(e) => setResourceLink(e.target.value)}
+              onChange={handleResourceLinkChange}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
               placeholder="https://drive.google.com/..."
               required
