@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Plus, Trash2, Edit2, LogOut, BookOpen, FolderOpen, FileText, X } from 'lucide-react';
 import { Semester, Subject, Resource } from '../../types';
 import { api } from '../../services/api';
@@ -15,19 +15,6 @@ interface ToastState {
   show: boolean;
 }
 
-interface ModalState {
-  semester: boolean;
-  subject: boolean;
-  resource: boolean;
-}
-
-interface FormData {
-  semesterName: string;
-  subjectName: string;
-  resourceTitle: string;
-  resourceLink: string;
-}
-
 export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
   const [semesters, setSemesters] = useState<Semester[]>([]);
   const [subjects, setSubjects] = useState<Subject[]>([]);
@@ -37,27 +24,24 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
   const [selectedSubject, setSelectedSubject] = useState<string | null>(null);
   const [toast, setToast] = useState<ToastState>({ message: '', type: 'success', show: false });
 
-  // Modal states
-  const [modals, setModals] = useState<ModalState>({
-    semester: false,
-    subject: false,
-    resource: false
-  });
+  // Modal states - separate for each modal
+  const [showSemesterModal, setShowSemesterModal] = useState(false);
+  const [showSubjectModal, setShowSubjectModal] = useState(false);
+  const [showResourceModal, setShowResourceModal] = useState(false);
   
-  const [formData, setFormData] = useState<FormData>({
-    semesterName: '',
-    subjectName: '',
-    resourceTitle: '',
-    resourceLink: ''
-  });
+  // Form states - separate for each form
+  const [semesterName, setSemesterName] = useState('');
+  const [subjectName, setSubjectName] = useState('');
+  const [resourceTitle, setResourceTitle] = useState('');
+  const [resourceLink, setResourceLink] = useState('');
 
   useEffect(() => {
     loadSemesters();
   }, []);
 
-  const showToast = (message: string, type: 'success' | 'error') => {
+  const showToast = useCallback((message: string, type: 'success' | 'error') => {
     setToast({ message, type, show: true });
-  };
+  }, []);
 
   const loadSemesters = async () => {
     try {
@@ -101,31 +85,47 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
     loadResources(subjectId);
   };
 
-  const openModal = (modalType: keyof ModalState) => {
-    setModals(prev => ({ ...prev, [modalType]: true }));
+  // Modal handlers
+  const openSemesterModal = () => {
+    setSemesterName('');
+    setShowSemesterModal(true);
   };
 
-  const closeModal = (modalType: keyof ModalState) => {
-    setModals(prev => ({ ...prev, [modalType]: false }));
-    // Reset form data when closing modal
-    if (modalType === 'semester') {
-      setFormData(prev => ({ ...prev, semesterName: '' }));
-    } else if (modalType === 'subject') {
-      setFormData(prev => ({ ...prev, subjectName: '' }));
-    } else if (modalType === 'resource') {
-      setFormData(prev => ({ ...prev, resourceTitle: '', resourceLink: '' }));
-    }
+  const closeSemesterModal = () => {
+    setShowSemesterModal(false);
+    setSemesterName('');
   };
 
-  const updateFormData = (field: keyof FormData, value: string) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
+  const openSubjectModal = () => {
+    setSubjectName('');
+    setShowSubjectModal(true);
   };
 
+  const closeSubjectModal = () => {
+    setShowSubjectModal(false);
+    setSubjectName('');
+  };
+
+  const openResourceModal = () => {
+    setResourceTitle('');
+    setResourceLink('');
+    setShowResourceModal(true);
+  };
+
+  const closeResourceModal = () => {
+    setShowResourceModal(false);
+    setResourceTitle('');
+    setResourceLink('');
+  };
+
+  // Form handlers
   const handleCreateSemester = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!semesterName.trim()) return;
+    
     try {
-      await api.createSemester(formData.semesterName);
-      closeModal('semester');
+      await api.createSemester(semesterName.trim());
+      closeSemesterModal();
       loadSemesters();
       showToast('Semester created successfully', 'success');
     } catch (error) {
@@ -135,11 +135,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
 
   const handleCreateSubject = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedSemester) return;
+    if (!subjectName.trim() || !selectedSemester) return;
     
     try {
-      await api.createSubject(formData.subjectName, selectedSemester);
-      closeModal('subject');
+      await api.createSubject(subjectName.trim(), selectedSemester);
+      closeSubjectModal();
       loadSubjects(selectedSemester);
       showToast('Subject created successfully', 'success');
     } catch (error) {
@@ -149,11 +149,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
 
   const handleCreateResource = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedSubject) return;
+    if (!resourceTitle.trim() || !resourceLink.trim() || !selectedSubject) return;
     
     try {
-      await api.createResource(formData.resourceTitle, formData.resourceLink, selectedSubject);
-      closeModal('resource');
+      await api.createResource(resourceTitle.trim(), resourceLink.trim(), selectedSubject);
+      closeResourceModal();
       loadResources(selectedSubject);
       showToast('Resource created successfully', 'success');
     } catch (error) {
@@ -207,6 +207,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
     }
   };
 
+  // Modal component
   const Modal: React.FC<{ isOpen: boolean; onClose: () => void; title: string; children: React.ReactNode }> = ({ isOpen, onClose, title, children }) => {
     if (!isOpen) return null;
 
@@ -218,6 +219,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
             <button
               onClick={onClose}
               className="text-gray-500 hover:text-gray-700"
+              type="button"
             >
               <X className="w-5 h-5" />
             </button>
@@ -257,8 +259,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
                 Semesters
               </h2>
               <button
-                onClick={() => openModal('semester')}
+                onClick={openSemesterModal}
                 className="flex items-center gap-1 px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                type="button"
               >
                 <Plus className="w-4 h-4" />
                 Add
@@ -283,6 +286,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
                       handleDeleteSemester(semester.id);
                     }}
                     className="text-red-600 hover:text-red-800 p-1"
+                    type="button"
                   >
                     <Trash2 className="w-4 h-4" />
                   </button>
@@ -299,9 +303,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
                 Subjects
               </h2>
               <button
-                onClick={() => openModal('subject')}
+                onClick={openSubjectModal}
                 disabled={!selectedSemester}
                 className="flex items-center gap-1 px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                type="button"
               >
                 <Plus className="w-4 h-4" />
                 Add
@@ -327,6 +332,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
                         handleDeleteSubject(subject.id);
                       }}
                       className="text-red-600 hover:text-red-800 p-1"
+                      type="button"
                     >
                       <Trash2 className="w-4 h-4" />
                     </button>
@@ -346,9 +352,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
                 Resources
               </h2>
               <button
-                onClick={() => openModal('resource')}
+                onClick={openResourceModal}
                 disabled={!selectedSubject}
                 className="flex items-center gap-1 px-3 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                type="button"
               >
                 <Plus className="w-4 h-4" />
                 Add
@@ -376,6 +383,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
                     <button
                       onClick={() => handleDeleteResource(resource.id)}
                       className="text-red-600 hover:text-red-800 p-1"
+                      type="button"
                     >
                       <Trash2 className="w-4 h-4" />
                     </button>
@@ -389,21 +397,22 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
         </div>
       </div>
 
-      {/* Modals */}
+      {/* Semester Modal */}
       <Modal
-        isOpen={modals.semester}
-        onClose={() => closeModal('semester')}
+        isOpen={showSemesterModal}
+        onClose={closeSemesterModal}
         title="Add New Semester"
       >
         <form onSubmit={handleCreateSemester} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label htmlFor="semesterName" className="block text-sm font-medium text-gray-700 mb-2">
               Semester Name
             </label>
             <input
+              id="semesterName"
               type="text"
-              value={formData.semesterName}
-              onChange={(e) => updateFormData('semesterName', e.target.value)}
+              value={semesterName}
+              onChange={(e) => setSemesterName(e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
               placeholder="e.g., 4-2"
               required
@@ -419,7 +428,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
             </button>
             <button
               type="button"
-              onClick={() => closeModal('semester')}
+              onClick={closeSemesterModal}
               className="flex-1 bg-gray-300 text-gray-700 py-2 px-4 rounded-lg hover:bg-gray-400 transition-colors"
             >
               Cancel
@@ -428,20 +437,22 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
         </form>
       </Modal>
 
+      {/* Subject Modal */}
       <Modal
-        isOpen={modals.subject}
-        onClose={() => closeModal('subject')}
+        isOpen={showSubjectModal}
+        onClose={closeSubjectModal}
         title="Add New Subject"
       >
         <form onSubmit={handleCreateSubject} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label htmlFor="subjectName" className="block text-sm font-medium text-gray-700 mb-2">
               Subject Name
             </label>
             <input
+              id="subjectName"
               type="text"
-              value={formData.subjectName}
-              onChange={(e) => updateFormData('subjectName', e.target.value)}
+              value={subjectName}
+              onChange={(e) => setSubjectName(e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
               placeholder="e.g., Mathematics"
               required
@@ -457,7 +468,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
             </button>
             <button
               type="button"
-              onClick={() => closeModal('subject')}
+              onClick={closeSubjectModal}
               className="flex-1 bg-gray-300 text-gray-700 py-2 px-4 rounded-lg hover:bg-gray-400 transition-colors"
             >
               Cancel
@@ -466,20 +477,22 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
         </form>
       </Modal>
 
+      {/* Resource Modal */}
       <Modal
-        isOpen={modals.resource}
-        onClose={() => closeModal('resource')}
+        isOpen={showResourceModal}
+        onClose={closeResourceModal}
         title="Add New Resource"
       >
         <form onSubmit={handleCreateResource} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label htmlFor="resourceTitle" className="block text-sm font-medium text-gray-700 mb-2">
               Resource Title
             </label>
             <input
+              id="resourceTitle"
               type="text"
-              value={formData.resourceTitle}
-              onChange={(e) => updateFormData('resourceTitle', e.target.value)}
+              value={resourceTitle}
+              onChange={(e) => setResourceTitle(e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
               placeholder="e.g., Chapter 1 Notes"
               required
@@ -487,13 +500,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label htmlFor="resourceLink" className="block text-sm font-medium text-gray-700 mb-2">
               Google Drive Link
             </label>
             <input
+              id="resourceLink"
               type="url"
-              value={formData.resourceLink}
-              onChange={(e) => updateFormData('resourceLink', e.target.value)}
+              value={resourceLink}
+              onChange={(e) => setResourceLink(e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
               placeholder="https://drive.google.com/..."
               required
@@ -509,7 +523,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
             </button>
             <button
               type="button"
-              onClick={() => closeModal('resource')}
+              onClick={closeResourceModal}
               className="flex-1 bg-gray-300 text-gray-700 py-2 px-4 rounded-lg hover:bg-gray-400 transition-colors"
             >
               Cancel
